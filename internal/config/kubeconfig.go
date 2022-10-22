@@ -1,4 +1,4 @@
-package kubeconfig
+package config
 
 import (
 	"flag"
@@ -11,7 +11,7 @@ import (
 	metrics "k8s.io/metrics/pkg/client/clientset/versioned"
 )
 
-func getcmdConfig() *rest.Config {
+func GetcmdConfig() *rest.Config {
 	var kubeconfig *string
 	if home := homedir.HomeDir(); home != "" {
 		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
@@ -27,8 +27,7 @@ func getcmdConfig() *rest.Config {
 	return config
 }
 
-func GetKubernetesClient() *kubernetes.Clientset {
-	config := getcmdConfig()
+func GetKubernetesClient(config *rest.Config) *kubernetes.Clientset {
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		panic(err.Error())
@@ -36,8 +35,7 @@ func GetKubernetesClient() *kubernetes.Clientset {
 	return clientset
 }
 
-func GetKubernetesMetrics() *metrics.Clientset {
-	config := getcmdConfig()
+func GetKubernetesMetrics(config *rest.Config) *metrics.Clientset {
 	metricsclientset, err := metrics.NewForConfig(config)
 	if err != nil {
 		panic(err.Error())
