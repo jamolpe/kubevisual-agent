@@ -1,4 +1,4 @@
-package podDescriber
+package podworker
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metrics "k8s.io/metrics/pkg/client/clientset/versioned"
 
 	"k8s.io/client-go/kubernetes"
@@ -17,22 +16,29 @@ import (
 )
 
 type (
-	PodDescriber struct {
+	PodWorker struct {
 		clientSet        *kubernetes.Clientset
 		metricsclientSet *metrics.Clientset
 	}
 	Pod struct {
-		Name   string `json:"name"`
-		Uid    string `json:"uid"`
-		Status Status `json:"status"`
+		Name      string `json:"name"`
+		Uid       string `json:"uid"`
+		Node      string `json:"node"`
+		Namespace string `json:"namespace"`
+		Status    Status `json:"status"`
 	}
 	Status struct {
-		Phase string              `json:"phase"`
-		Usage *v1beta1.PodMetrics `json:"usage"`
+		Phase string `json:"phase"`
+		Usage *Usage `json:"usage"`
+	}
+
+	Usage struct {
+		Cpu    float64 `json:"cpu"`
+		Memory int64   `json:"memory"`
 	}
 )
 
-func New() *PodDescriber {
+func New() *PodWorker {
 	var kubeconfig *string
 	if home := homedir.HomeDir(); home != "" {
 		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
@@ -50,25 +56,33 @@ func New() *PodDescriber {
 	if err != nil || err2 != nil {
 		panic(err.Error())
 	}
-	return &PodDescriber{clientSet: clientset, metricsclientSet: metricsclientset}
+	return &PodWorker{clientSet: clientset, metricsclientSet: metricsclientset}
 }
 
-func (pdc *PodDescriber) mapPods(pods []corev1.Pod) []Pod {
+func (pdc *PodWorker) mapPods(pods []corev1.Pod) []Pod {
 	var finalPods []Pod
 	fmt.Print()
 
 	for _, p := range pods {
 		podmetrics, err := pdc.metricsclientSet.MetricsV1beta1().PodMetricses(p.Namespace).Get(context.TODO(), p.GetName(), metav1.GetOptions{})
-		pod := Pod{Name: p.Name, Uid: string(p.UID), Status: Status{Phase: string(p.Status.Phase)}}
+		pod := Pod{Name: p.Name, Uid: string(p.UID), Node: p.Spec.NodeName, Namespace: p.Namespace, Status: Status{Phase: string(p.Status.Phase)}}
 		if err == nil {
-			pod.Status.Usage = podmetrics
+			var totalMemory int64 = 0
+			var totalCpu float64 = 0
+			for _, cont := range podmetrics.Containers {
+				memory, _ := cont.Usage.Memory().AsInt64()
+				cpu := cont.Usage.Cpu().AsApproximateFloat64()
+				totalMemory += memory
+				totalCpu += cpu
+			}
+			pod.Status.Usage = &Usage{Cpu: totalCpu, Memory: totalMemory}
 		}
 		finalPods = append(finalPods, pod)
 	}
 	return finalPods
 }
 
-func (pdc *PodDescriber) GetAllPodsInformation() ([]Pod, error) {
+func (pdc *PodWorker) GetAllPodsInformation() ([]Pod, error) {
 
 	pods, err := pdc.clientSet.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
 	if err != nil {

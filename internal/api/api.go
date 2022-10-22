@@ -4,17 +4,17 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/jamolpe/kubevisual-agent/internal/podDescriber"
+	"github.com/jamolpe/kubevisual-agent/internal/podworker"
 )
 
 type API struct {
 	app          *fiber.App
-	podDescriber *podDescriber.PodDescriber
+	podDescriber *podworker.PodWorker
 }
 
 func New() *API {
 	app := fiber.New()
-	return &API{app: app, podDescriber: podDescriber.New()}
+	return &API{app: app, podDescriber: podworker.New()}
 }
 
 func (api *API) Configure() {
