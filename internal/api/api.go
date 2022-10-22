@@ -4,17 +4,22 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/jamolpe/kubevisual-agent/internal/kubeconfig"
+	"github.com/jamolpe/kubevisual-agent/internal/nodeworker"
 	"github.com/jamolpe/kubevisual-agent/internal/podworker"
 )
 
 type API struct {
-	app          *fiber.App
-	podDescriber *podworker.PodWorker
+	app        *fiber.App
+	podWorker  *podworker.PodWorker
+	nodeWorker *nodeworker.NodeWorker
 }
 
 func New() *API {
 	app := fiber.New()
-	return &API{app: app, podDescriber: podworker.New()}
+	kubeclient := kubeconfig.GetKubernetesClient()
+	metricsClient := kubeconfig.GetKubernetesMetrics()
+	return &API{app: app, podWorker: podworker.New(kubeclient, metricsClient), nodeWorker: nodeworker.New(kubeclient, metricsClient)}
 }
 
 func (api *API) Configure() {
