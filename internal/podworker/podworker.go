@@ -38,13 +38,20 @@ func New(kubeclient *kubernetes.Clientset, metricsClient *metrics.Clientset) *Po
 	return &PodWorker{kubeClient: kubeclient, metricsClient: metricsClient}
 }
 
+func determinePodStatus(pod corev1.Pod, status string) string {
+	if pod.DeletionTimestamp != nil {
+		return "Terminating"
+	}
+	return status
+}
+
 func (pw *PodWorker) mapPods(pods []corev1.Pod) []Pod {
 	var finalPods []Pod
 	fmt.Print()
 
 	for _, p := range pods {
 		podmetrics, err := pw.metricsClient.MetricsV1beta1().PodMetricses(p.Namespace).Get(context.TODO(), p.GetName(), metav1.GetOptions{})
-		pod := Pod{Name: p.Name, Uid: string(p.UID), Node: p.Spec.NodeName, Namespace: p.Namespace, Status: Status{Phase: string(p.Status.Phase)}}
+		pod := Pod{Name: p.Name, Uid: string(p.UID), Node: p.Spec.NodeName, Namespace: p.Namespace, Status: Status{Phase: determinePodStatus(p, string(p.Status.Phase))}}
 		if err == nil {
 			var totalMemory int64 = 0
 			var totalCpu float64 = 0
