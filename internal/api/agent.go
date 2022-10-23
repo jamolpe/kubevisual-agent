@@ -10,7 +10,7 @@ func (api *API) AgentRoutes(router fiber.Router) {
 
 func (api *API) PodRoutes(router fiber.Router) {
 	router.Get("/pod", func(c *fiber.Ctx) error {
-		pods, err := api.podDescriber.GetAllPodsInformation()
+		pods, err := api.podWorker.GetAllPodsInformation()
 		if err != nil {
 			return c.Status(500).JSON(&Error{message: "error geting pod info"})
 		}
