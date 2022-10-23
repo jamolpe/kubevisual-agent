@@ -21,6 +21,8 @@ func GetcmdConfig() *rest.Config {
 	flag.Parse()
 
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	config.Burst = 20
+	config.QPS = 10
 	if err != nil {
 		panic(err.Error())
 	}
