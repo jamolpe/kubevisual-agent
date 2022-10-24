@@ -3,6 +3,7 @@ package podworker
 import (
 	"context"
 	"fmt"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,11 +18,13 @@ type (
 		metricsClient *metrics.Clientset
 	}
 	Pod struct {
-		Name      string `json:"name"`
-		Uid       string `json:"uid"`
-		Node      string `json:"node"`
-		Namespace string `json:"namespace"`
-		Status    Status `json:"status"`
+		Name      string  `json:"name"`
+		Uid       string  `json:"uid"`
+		Node      string  `json:"node"`
+		Namespace string  `json:"namespace"`
+		Age       float64 `json:"age"`
+		Restarts  int     `json:"restarts"`
+		Status    Status  `json:"status"`
 	}
 	Status struct {
 		Phase string `json:"phase"`
@@ -45,13 +48,25 @@ func determinePodStatus(pod corev1.Pod, status string) string {
 	return status
 }
 
+func countRestarts(pod corev1.Pod) int {
+	if len(pod.Status.ContainerStatuses) > 0 {
+		return int(pod.Status.ContainerStatuses[0].RestartCount)
+	}
+	return 0
+}
+
+func determineAge(pod corev1.Pod) float64 {
+	diff := time.Since(pod.Status.StartTime.Time).Seconds()
+	return diff
+}
+
 func (pw *PodWorker) mapPods(pods []corev1.Pod) []Pod {
 	var finalPods []Pod
 	fmt.Print()
 
 	for _, p := range pods {
 		podmetrics, err := pw.metricsClient.MetricsV1beta1().PodMetricses(p.Namespace).Get(context.TODO(), p.GetName(), metav1.GetOptions{})
-		pod := Pod{Name: p.Name, Uid: string(p.UID), Node: p.Spec.NodeName, Namespace: p.Namespace, Status: Status{Phase: determinePodStatus(p, string(p.Status.Phase))}}
+		pod := Pod{Name: p.Name, Uid: string(p.UID), Node: p.Spec.NodeName, Namespace: p.Namespace, Age: determineAge(p), Restarts: countRestarts(p), Status: Status{Phase: determinePodStatus(p, string(p.Status.Phase))}}
 		if err == nil {
 			var totalMemory int64 = 0
 			var totalCpu float64 = 0
